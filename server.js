@@ -40,6 +40,17 @@ app.post('/generate-questions', async (req, res) => {
   }
 
   try {
+    // Calculate the upcoming Monday→Sunday window
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0=Sun, 1=Mon ... 6=Sat
+    const daysUntilMonday = dayOfWeek === 0 ? 1 : (8 - dayOfWeek) % 7 || 7;
+    const nextMonday = new Date(today);
+    nextMonday.setDate(today.getDate() + daysUntilMonday);
+    const nextSunday = new Date(nextMonday);
+    nextSunday.setDate(nextMonday.getDate() + 6);
+    const fmt = (d) => d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    const quizWindow = `${fmt(nextMonday)} to ${fmt(nextSunday)}`;
+
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
@@ -53,21 +64,23 @@ app.post('/generate-questions', async (req, res) => {
         messages: [
           {
             role: 'user',
-            content: `You are helping create prediction questions for a weekly prediction game. Generate 12 prediction questions (3 per category) for the upcoming week.
+            content: `You are helping create prediction questions for a weekly prediction game. Generate 12 prediction questions (3 per category) for the quiz week running from ${quizWindow}.
+
+CRITICAL: All questions must be about events that will be DECIDED or RESOLVED during this specific week (${quizWindow}). Do NOT generate questions about events that will have already happened before ${fmt(nextMonday)}, and do NOT generate questions about events happening after ${fmt(nextSunday)}. The quiz opens on ${fmt(nextMonday)} and locks on ${fmt(nextSunday)} — every question must be answerable by ${fmt(nextSunday)}.
 
 Requirements:
-- 3 SPORTS questions (specific games, tournaments, player performance)
-- 3 POLITICS & NEWS questions (current events, policy decisions, elections)
-- 3 ECONOMICS & FINANCE questions (stock market, unemployment, sector performance)
+- 3 SPORTS questions (specific games, tournaments, player performance happening this week)
+- 3 POLITICS & NEWS questions (votes, decisions, announcements expected this week)
+- 3 ECONOMICS & FINANCE questions (data releases, market moves, earnings reports this week)
 - 3 ANOMALIES questions (wildcards: weather records, viral moments, unexpected science, unusual events)
 
 For each question:
-- Make it specific and time-bound (happening this week or next)
+- Make it specific and verifiable — someone must be able to check the result by ${fmt(nextSunday)}
 - Include 2-4 clear answer options
-- Make it verifiable (can check the result)
-- Binary questions preferred, but multiple choice is fine
+- Binary (Yes/No, Win/Loss) preferred, multiple choice fine
 
-Current date: ${new Date().toLocaleDateString()}
+Today's date (when questions are being generated): ${today.toLocaleDateString('en-GB')}
+Quiz week: ${quizWindow}
 
 Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
 {
