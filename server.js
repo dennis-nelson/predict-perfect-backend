@@ -59,7 +59,7 @@ Requirements:
 - 3 SPORTS questions (specific games, tournaments, player performance)
 - 3 POLITICS & NEWS questions (current events, policy decisions, elections)
 - 3 ECONOMICS & FINANCE questions (stock market, unemployment, sector performance)
-- 3 POP CULTURE questions (movies, TV shows, music, streaming)
+- 3 ANOMALIES questions (wildcards: weather records, viral moments, unexpected science, unusual events)
 
 For each question:
 - Make it specific and time-bound (happening this week or next)
@@ -78,8 +78,8 @@ Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
       "options": ["Win", "Loss"]
     },
     {
-      "category": "politics",
-      "question_text": "Will the Fed announce an interest rate change this week?",
+      "category": "anomalies",
+      "question_text": "Will a new world record be set at the World Athletics Championships this week?",
       "options": ["Yes", "No"]
     }
   ]
