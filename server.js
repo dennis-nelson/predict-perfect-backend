@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const app = express();
@@ -8,12 +9,29 @@ const PORT = process.env.PORT || 3001;
 // ─── Middleware ───────────────────────────────────────────────────────────────
 
 app.use(cors({
-  origin: '*',
+  origin: process.env.ALLOWED_ORIGIN || 'https://www.predictperfect.com',
   methods: ['GET', 'POST'],
   allowedHeaders: ['Content-Type']
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '50kb' })); // Prevent oversized payloads
+
+// Rate limiters — protect expensive Claude API calls
+const generateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10,                   // max 10 question generation requests per hour per IP
+  message: { error: 'Too many requests. Please wait before generating more questions.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const scoreLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20,                   // max 20 auto-score requests per hour per IP
+  message: { error: 'Too many requests. Please wait before scoring again.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 // ─── Health Check ─────────────────────────────────────────────────────────────
 // Visit this URL to confirm your server is running
@@ -29,7 +47,7 @@ app.get('/', (req, res) => {
 // ─── Generate Questions ───────────────────────────────────────────────────────
 // Called by QuestionGenerator.jsx in the admin panel
 
-app.post('/generate-questions', async (req, res) => {
+app.post('/generate-questions', generateLimiter, async (req, res) => {
   console.log('[generate-questions] Request received');
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -140,7 +158,7 @@ Respond ONLY with valid JSON in this exact format (no markdown, no explanation):
 // ─── Auto-Score with Web Search ───────────────────────────────────────────────
 // Called by AutoScoreWithAPIs.jsx in the admin panel
 
-app.post('/auto-score', async (req, res) => {
+app.post('/auto-score', scoreLimiter, async (req, res) => {
   console.log('[auto-score] Request received');
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -154,6 +172,10 @@ app.post('/auto-score', async (req, res) => {
 
   if (!questions || !Array.isArray(questions) || questions.length === 0) {
     return res.status(400).json({ error: 'No questions provided' });
+  }
+
+  if (questions.length > 50) {
+    return res.status(400).json({ error: 'Too many questions. Maximum 50 per request.' });
   }
 
   // Helper to safely parse options (copied from frontend)
